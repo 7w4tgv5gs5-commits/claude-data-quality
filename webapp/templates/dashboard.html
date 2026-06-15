@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Kimball Analytics{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_meta %}<span id="last-updated">—</span>{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<!-- KPI Row -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">Total Revenue</div>
+    <div class="kpi-value accent" id="kpi-revenue">—</div>
+    <div class="kpi-sub">positive line totals only</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Total Orders</div>
+    <div class="kpi-value" id="kpi-orders">—</div>
+    <div class="kpi-sub">all fact rows</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Active Customers</div>
+    <div class="kpi-value" id="kpi-customers">—</div>
+    <div class="kpi-sub">with at least 1 order</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Products</div>
+    <div class="kpi-value" id="kpi-products">—</div>
+    <div class="kpi-sub">with valid list price</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="card-title">Revenue by Category</div>
+    <canvas id="chart-category"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="card-title">Orders Over Time — monthly</div>
+    <canvas id="chart-timeline"></canvas>
+  </div>
+</div>
+
+<!-- Top Customers -->
+<div class="card">
+  <div class="section-header">
+    <div class="section-title">Top Customers by Spend</div>
+    <span class="count-chip">top 10</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Customer</th>
+          <th>Country</th>
+          <th>Orders</th>
+          <th>Total Spent</th>
+        </tr>
+      </thead>
+      <tbody id="top-customers-body">
+        <tr><td colspan="5" class="loading">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Chart.js global defaults
+  Chart.defaults.color = '#6b7280';
+  Chart.defaults.borderColor = '#e5e7eb';
+  Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+  Chart.defaults.font.size = 10;
+
+  const fmtCurrency = v => {
+    if (v == null) return '—';
+    const a = Math.abs(v);
+    if (a >= 1_000_000) return (v < 0 ? '-' : '') + '$' + (a / 1_000_000).toFixed(2) + 'M';
+    if (a >= 1_000)     return (v < 0 ? '-' : '') + '$' + (a / 1_000).toFixed(1) + 'K';
+    return '$' + v.toFixed(2);
+  };
+
+  function animateCount(el, target, fmt) {
+    const dur = 900, start = Date.now();
+    const tick = () => {
+      const p = Math.min(1, (Date.now() - start) / dur);
+      const ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(target * ease);
+      if (p < 1) requestAnimationFrame(tick);
+      else el.textContent = fmt(target);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  async function loadKPIs() {
+    const d = await fetch('/api/kpis').then(r => r.json());
+    document.getElementById('last-updated').textContent =
+      'updated ' + new Date().toLocaleTimeString();
+    animateCount(document.getElementById('kpi-revenue'),   d.total_revenue,      fmtCurrency);
+    animateCount(document.getElementById('kpi-orders'),    d.total_orders,       v => Math.round(v).toLocaleString());
+    animateCount(document.getElementById('kpi-customers'), d.active_customers,   v => Math.round(v).toLocaleString());
+    animateCount(document.getElementById('kpi-products'),  d.total_products,     v => Math.round(v).toLocaleString());
+  }
+
+  async function loadCategoryChart() {
+    const data = await fetch('/api/revenue-by-category').then(r => r.json());
+    const ctx  = document.getElementById('chart-category').getContext('2d');
+    const palette = ['#1d6fa4','#0f748f','#166534','#92400e','#1557a0','#065f46','#6b21a8','#b45309'];
+
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.category),
+        datasets: [{
+          data: data.map(d => d.revenue),
+          backgroundColor: data.map((_, i) => palette[i % palette.length] + '22'),
+          borderColor:     data.map((_, i) => palette[i % palette.length]),
+          borderWidth: 1,
+          borderRadius: 2,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => '  ' + fmtCurrency(c.raw) } },
+        },
+        scales: {
+          x: {
+            grid: { color: '#e5e7eb' },
+            ticks: { callback: v => fmtCurrency(v) },
+          },
+          y: { grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  async function loadTimelineChart() {
+    const data = await fetch('/api/orders-over-time').then(r => r.json());
+    const ctx  = document.getElementById('chart-timeline').getContext('2d');
+    const labels = data.map(d => d.month_name.slice(0, 3) + ' ' + String(d.year).slice(2));
+
+    const grad = ctx.createLinearGradient(0, 0, 0, 250);
+    grad.addColorStop(0, 'rgba(29,111,164,0.15)');
+    grad.addColorStop(1, 'rgba(29,111,164,0)');
+
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Revenue',
+          data: data.map(d => d.revenue),
+          borderColor: '#1d6fa4',
+          backgroundColor: grad,
+          borderWidth: 1.5,
+          pointRadius: 2.5,
+          pointBackgroundColor: '#1d6fa4',
+          pointBorderColor: 'transparent',
+          fill: true,
+          tension: 0.35,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => '  ' + fmtCurrency(c.raw) } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+          y: {
+            grid: { color: '#e5e7eb' },
+            ticks: { callback: v => fmtCurrency(v) },
+          },
+        },
+      },
+    });
+  }
+
+  async function loadTopCustomers() {
+    const data = await fetch('/api/top-customers').then(r => r.json());
+    const tbody = document.getElementById('top-customers-body');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No data</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map((r, i) => `
+      <tr>
+        <td class="mono muted">${String(i + 1).padStart(2, '0')}</td>
+        <td>${r.full_name || '<span class="null-val">Unknown</span>'}</td>
+        <td><span class="tag">${r.country || '—'}</span></td>
+        <td class="mono">${r.orders}</td>
+        <td class="mono pos">${fmtCurrency(r.total_spent)}</td>
+      </tr>
+    `).join('');
+  }
+
+  Promise.all([loadKPIs(), loadCategoryChart(), loadTimelineChart(), loadTopCustomers()]);
+</script>
+{% endblock %}

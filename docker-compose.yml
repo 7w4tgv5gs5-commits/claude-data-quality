@@ -1,0 +1,51 @@
+services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: kimball
+      POSTGRES_DB:       postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:         ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval:     5s
+      timeout:      5s
+      retries:      15
+      start_period: 10s
+
+  # ── One-shot seeder: creates testdb + testdb_kimball ─────────────────────
+  seeder:
+    build:
+      context:    .
+      dockerfile: webapp/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python /app/docker/seed.py
+    environment:
+      PGHOST:     db
+      PGUSER:     postgres
+      PGPASSWORD: kimball
+
+  # ── Web application ───────────────────────────────────────────────────────
+  app:
+    build:
+      context:    .
+      dockerfile: webapp/Dockerfile
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+    ports:
+      - "8765:8765"
+    environment:
+      PGHOST:     db
+      PGUSER:     postgres
+      PGPASSWORD: kimball
+      DB_NAME:    testdb_kimball
+    command: uvicorn main:app --host 0.0.0.0 --port 8765
+
+volumes:
+  pgdata:

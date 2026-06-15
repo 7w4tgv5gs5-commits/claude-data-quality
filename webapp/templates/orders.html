@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Orders · Kimball Analytics{% endblock %}
+{% block page_title %}Orders{% endblock %}
+{% block page_meta %}fact_orders · 600 rows{% endblock %}
+
+{% block content %}
+
+<div class="search-bar">
+  <input type="text" class="search-input" id="search-q"
+         placeholder="Search by customer, product or SKU…" autocomplete="off">
+  <input type="date" class="search-input" id="date-from"
+         style="flex:0;min-width:148px" title="From date">
+  <input type="date" class="search-input" id="date-to"
+         style="flex:0;min-width:148px" title="To date">
+</div>
+
+<div class="card">
+  <div class="section-header">
+    <div class="section-title">Order Lines</div>
+    <span class="count-chip" id="result-count">—</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Customer</th>
+          <th>Product</th>
+          <th>Category</th>
+          <th>Date</th>
+          <th>Qty</th>
+          <th>Unit Price</th>
+          <th>Line Total</th>
+          <th>Flags</th>
+        </tr>
+      </thead>
+      <tbody id="orders-body">
+        <tr><td colspan="9" class="loading">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let debounceTimer;
+
+  const fmt$ = v => v == null ? '<span class="null-val">NULL</span>'
+    : `<span class="${v < 0 ? 'neg' : ''}">${v < 0 ? '-' : ''}$${Math.abs(Number(v)).toFixed(2)}</span>`;
+
+  function orderFlags(r) {
+    const f = [];
+    if (r.quantity != null && r.quantity < 0)  f.push('<span class="badge badge-error">NEG qty</span>');
+    if (r.quantity === 0)                       f.push('<span class="badge badge-warning">ZERO qty</span>');
+    if (r.unit_price != null && r.unit_price < 0) f.push('<span class="badge badge-error">NEG price</span>');
+    if (!r.customer || r.customer.trim() === '') f.push('<span class="badge badge-error">UNKNOWN cust</span>');
+    if (!r.order_date)                          f.push('<span class="badge badge-warning">NO DATE</span>');
+    return f.join(' ') || '';
+  }
+
+  function lineTotalClass(v) {
+    if (v == null) return '';
+    if (v < 0) return 'neg';
+    if (v > 50_000) return 'pos';
+    return '';
+  }
+
+  async function loadOrders() {
+    const q  = document.getElementById('search-q').value.trim();
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    const params = new URLSearchParams();
+    if (q)  params.set('q', q);
+    if (df) params.set('date_from', df);
+    if (dt) params.set('date_to', dt);
+
+    document.getElementById('orders-body').innerHTML =
+      '<tr><td colspan="9" class="loading">Searching…</td></tr>';
+
+    const data = await fetch('/api/orders/search?' + params).then(r => r.json());
+    document.getElementById('result-count').textContent = data.length + ' rows';
+
+    if (!data.length) {
+      document.getElementById('orders-body').innerHTML =
+        '<tr><td colspan="9" class="empty-state">No results found</td></tr>';
+      return;
+    }
+
+    document.getElementById('orders-body').innerHTML = data.map(r => `
+      <tr>
+        <td class="mono muted">#${r.order_id}</td>
+        <td>${r.customer || '<span class="null-val">Unknown</span>'}</td>
+        <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis" title="${r.product || ''}">
+          ${r.product || '<span class="null-val">Unknown</span>'}
+        </td>
+        <td>${r.category ? `<span class="tag tag-cat">${r.category}</span>` : '<span class="null-val">—</span>'}</td>
+        <td class="mono">${r.order_date || '<span class="null-val">NULL</span>'}</td>
+        <td class="mono ${r.quantity < 0 ? 'neg' : r.quantity === 0 ? 'muted' : ''}">${r.quantity ?? '—'}</td>
+        <td class="mono">${fmt$(r.unit_price)}</td>
+        <td class="mono ${lineTotalClass(r.line_total)}">${fmt$(r.line_total)}</td>
+        <td>${orderFlags(r)}</td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById('search-q').addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(loadOrders, 270);
+  });
+  document.getElementById('date-from').addEventListener('change', loadOrders);
+  document.getElementById('date-to').addEventListener('change', loadOrders);
+
+  loadOrders();
+</script>
+{% endblock %}

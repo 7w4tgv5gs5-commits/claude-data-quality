@@ -335,7 +335,7 @@ def main():
     args = parse_args()
 
     random.seed(args.seed)
-    fake = Faker()
+    fake = Faker('en_AU')
     Faker.seed(args.seed)
 
     n_customers = args.rows

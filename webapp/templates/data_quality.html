@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Data Quality · Kimball Analytics{% endblock %}
+{% block page_title %}Data Quality{% endblock %}
+{% block page_meta %}live audit · testdb_kimball{% endblock %}
+
+{% block content %}
+
+<!-- Summary strip -->
+<div class="kpi-grid" id="dq-summary">
+  <div class="kpi-card" style="grid-column:span 4">
+    <div class="loading">Running audit…</div>
+  </div>
+</div>
+
+<!-- Per-table check panels -->
+<div id="dq-panels"></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const TABLE_ACCENTS = {
+    'dim_customer': 'var(--accent)',
+    'dim_product':  'var(--teal)',
+    'fact_orders':  'var(--green)',
+    'dim_date':     'var(--amber)',
+  };
+
+  async function loadDQ() {
+    const { checks, summary } = await fetch('/api/data-quality').then(r => r.json());
+
+    // ── Summary KPIs ──────────────────────────────────────────────────────
+    document.getElementById('dq-summary').innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-label">Error Checks</div>
+        <div class="kpi-value neg">${summary.error_count}</div>
+        <div class="kpi-sub">${summary.error_rows.toLocaleString()} affected rows</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Warning Checks</div>
+        <div class="kpi-value" style="color:var(--amber)">${summary.warning_count}</div>
+        <div class="kpi-sub">${summary.warning_rows.toLocaleString()} affected rows</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Clean Checks</div>
+        <div class="kpi-value pos">${summary.clean_count}</div>
+        <div class="kpi-sub">of ${summary.total_checks} total</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Issue Rows</div>
+        <div class="kpi-value">${(summary.error_rows + summary.warning_rows).toLocaleString()}</div>
+        <div class="kpi-sub">across all checks</div>
+      </div>
+    `;
+
+    // ── Group checks by table ─────────────────────────────────────────────
+    const byTable = {};
+    for (const c of checks) {
+      (byTable[c.table] = byTable[c.table] || []).push(c);
+    }
+
+    document.getElementById('dq-panels').innerHTML = Object.entries(byTable).map(([table, items]) => {
+      const accent    = TABLE_ACCENTS[table] || 'var(--border2)';
+      const errorCnt  = items.filter(c => c.severity === 'ERROR'   && c.affected > 0).length;
+      const warnCnt   = items.filter(c => c.severity === 'WARNING' && c.affected > 0).length;
+      const cleanCnt  = items.filter(c => c.affected === 0).length;
+
+      const summary_chips = [
+        errorCnt  ? `<span class="badge badge-error">${errorCnt} error${errorCnt>1?'s':''}</span>` : '',
+        warnCnt   ? `<span class="badge badge-warning">${warnCnt} warning${warnCnt>1?'s':''}</span>` : '',
+        cleanCnt  ? `<span class="badge badge-ok">${cleanCnt} pass${cleanCnt>1?'es':''}</span>` : '',
+      ].filter(Boolean).join(' ');
+
+      const rows = items.map(c => {
+        const isErr  = c.severity === 'ERROR';
+        const isPass = c.affected === 0;
+
+        const sevBadge = `<span class="badge badge-${isErr ? 'error' : 'warning'}">${c.severity}</span>`;
+
+        const statusBadge = isPass
+          ? '<span class="badge badge-ok">PASS</span>'
+          : `<span class="badge badge-${isErr ? 'error' : 'warning'}">FAIL · ${c.affected.toLocaleString()} row${c.affected !== 1 ? 's' : ''}</span>`;
+
+        const affectedClass = isPass ? 'pos' : isErr ? 'neg' : 'muted';
+
+        return `<tr>
+          <td>${c.check}</td>
+          <td>${sevBadge}</td>
+          <td class="mono ${affectedClass}">${c.affected.toLocaleString()}</td>
+          <td>${statusBadge}</td>
+        </tr>`;
+      }).join('');
+
+      return `
+        <div class="card" style="margin-bottom:14px;border-left:2px solid ${accent}">
+          <div class="section-header">
+            <div class="section-title" style="font-family:'Space Mono',monospace;font-size:13px;color:${accent}">
+              ${table}
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${summary_chips}
+              <span class="count-chip">${items.length} checks</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Check</th>
+                  <th>Severity</th>
+                  <th>Affected Rows</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  loadDQ();
+</script>
+{% endblock %}

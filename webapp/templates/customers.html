@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Customers · Kimball Analytics{% endblock %}
+{% block page_title %}Customers{% endblock %}
+{% block page_meta %}dim_customer · 200 source rows{% endblock %}
+
+{% block content %}
+
+<div class="search-bar">
+  <input type="text" class="search-input" id="search-q"
+         placeholder="Search by name or email…" autocomplete="off">
+  <select class="search-input" id="filter-country">
+    <option value="">All Countries</option>
+    {% for c in countries %}
+    <option value="{{ c }}">{{ c }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<div class="card">
+  <div class="section-header">
+    <div class="section-title">Customer Records</div>
+    <span class="count-chip" id="result-count">—</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Country</th>
+          <th>Signup</th>
+          <th>Orders</th>
+          <th>Total Spent</th>
+        </tr>
+      </thead>
+      <tbody id="customers-body">
+        <tr><td colspan="7" class="loading">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const fmtMoney = v => v == null ? '—'
+    : v >= 1_000_000 ? '$' + (v/1_000_000).toFixed(2)+'M'
+    : v >= 1_000     ? '$' + (v/1_000).toFixed(1)+'K'
+    : '$' + Number(v).toFixed(2);
+
+  let debounceTimer;
+
+  async function loadCustomers() {
+    const q       = document.getElementById('search-q').value.trim();
+    const country = document.getElementById('filter-country').value;
+    const params  = new URLSearchParams();
+    if (q)       params.set('q', q);
+    if (country) params.set('country', country);
+
+    document.getElementById('customers-body').innerHTML =
+      '<tr><td colspan="7" class="loading">Searching…</td></tr>';
+
+    const data = await fetch('/api/customers/search?' + params).then(r => r.json());
+    document.getElementById('result-count').textContent = data.length + ' rows';
+
+    if (!data.length) {
+      document.getElementById('customers-body').innerHTML =
+        '<tr><td colspan="7" class="empty-state">No results found</td></tr>';
+      return;
+    }
+
+    document.getElementById('customers-body').innerHTML = data.map(r => {
+      const emailHtml = r.email
+        ? `<span class="cyan" style="font-size:12px">${r.email}</span>`
+        : '<span class="null-val">NULL</span>';
+
+      const spentClass = r.total_spent > 10_000 ? 'pos'
+                       : r.total_spent > 0      ? 'accent'
+                       : 'muted';
+
+      return `<tr>
+        <td class="mono muted">${r.customer_id}</td>
+        <td>${r.full_name || '<span class="null-val">—</span>'}</td>
+        <td>${emailHtml}</td>
+        <td>${r.country ? `<span class="tag">${r.country}</span>` : '<span class="null-val">NULL</span>'}</td>
+        <td class="mono">${r.signup_date || '<span class="null-val">—</span>'}</td>
+        <td class="mono">${r.orders}</td>
+        <td class="mono ${spentClass}">${fmtMoney(r.total_spent)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('search-q').addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(loadCustomers, 270);
+  });
+  document.getElementById('filter-country').addEventListener('change', loadCustomers);
+
+  loadCustomers();
+</script>
+{% endblock %}

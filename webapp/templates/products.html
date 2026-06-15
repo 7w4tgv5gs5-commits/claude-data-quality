@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Products · Kimball Analytics{% endblock %}
+{% block page_title %}Products{% endblock %}
+{% block page_meta %}dim_product · 66 source rows{% endblock %}
+
+{% block content %}
+
+<div class="search-bar">
+  <input type="text" class="search-input" id="search-q"
+         placeholder="Search by name or SKU…" autocomplete="off">
+  <select class="search-input" id="filter-category">
+    <option value="">All Categories</option>
+    {% for c in categories %}
+    <option value="{{ c }}">{{ c }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<div class="card">
+  <div class="section-header">
+    <div class="section-title">Product Catalogue</div>
+    <span class="count-chip" id="result-count">—</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th>List Price</th>
+          <th>Stock</th>
+          <th>Orders</th>
+          <th>Issues</th>
+        </tr>
+      </thead>
+      <tbody id="products-body">
+        <tr><td colspan="7" class="loading">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let debounceTimer;
+
+  function issueFlags(r) {
+    const f = [];
+    if (r.list_price == null)   f.push('<span class="badge badge-warning">NULL price</span>');
+    else if (r.list_price < 0)  f.push('<span class="badge badge-error">NEG price</span>');
+    else if (r.list_price === 0) f.push('<span class="badge badge-warning">ZERO price</span>');
+    if (r.stock < 0)            f.push('<span class="badge badge-error">NEG stock</span>');
+    if (!r.sku)                 f.push('<span class="badge badge-warning">NULL sku</span>');
+    if (!r.name)                f.push('<span class="badge badge-warning">NULL name</span>');
+    return f.length ? f.join(' ') : '<span class="badge badge-ok">CLEAN</span>';
+  }
+
+  async function loadProducts() {
+    const q   = document.getElementById('search-q').value.trim();
+    const cat = document.getElementById('filter-category').value;
+    const params = new URLSearchParams();
+    if (q)   params.set('q', q);
+    if (cat) params.set('category', cat);
+
+    document.getElementById('products-body').innerHTML =
+      '<tr><td colspan="7" class="loading">Searching…</td></tr>';
+
+    const data = await fetch('/api/products/search?' + params).then(r => r.json());
+    document.getElementById('result-count').textContent = data.length + ' rows';
+
+    if (!data.length) {
+      document.getElementById('products-body').innerHTML =
+        '<tr><td colspan="7" class="empty-state">No results found</td></tr>';
+      return;
+    }
+
+    document.getElementById('products-body').innerHTML = data.map(r => {
+      const priceClass = r.list_price == null ? '' : r.list_price < 0 ? 'neg' : r.list_price === 0 ? 'muted' : '';
+      const priceHtml  = r.list_price == null
+        ? '<span class="null-val">NULL</span>'
+        : `<span class="${priceClass}">$${Number(r.list_price).toFixed(2)}</span>`;
+
+      return `<tr>
+        <td class="mono accent">${r.sku || '<span class="null-val">NULL</span>'}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.name || '<span class="null-val">NULL</span>'}</td>
+        <td>${r.category ? `<span class="tag tag-cat">${r.category}</span>` : '<span class="null-val">—</span>'}</td>
+        <td class="mono">${priceHtml}</td>
+        <td class="mono ${r.stock < 0 ? 'neg' : ''}">${r.stock}</td>
+        <td class="mono">${r.orders}</td>
+        <td>${issueFlags(r)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('search-q').addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(loadProducts, 270);
+  });
+  document.getElementById('filter-category').addEventListener('change', loadProducts);
+
+  loadProducts();
+</script>
+{% endblock %}
