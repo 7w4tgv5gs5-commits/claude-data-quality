@@ -18,14 +18,17 @@ generate_data.py
   testdb (dirty source data)
       │
       ├── /data-quality slash command  ──→  markdown audit report
+      │                                         │
+      │                                         └── --html  ──→  data-quality-report.html
+      │
+      ├── erd.html  (Mermaid.js ER diagram for both databases)
       │
       └── ETL (build_kimball.sql / docker/seed.py)
                 │
                 ▼
         testdb_kimball (star schema)
                 │
-                ▼
-         webapp (FastAPI)  ──→  http://localhost:8765
+                └── webapp (FastAPI)  ──→  http://localhost:8765
 ```
 
 ---
@@ -141,7 +144,7 @@ All search fields update results in real time with a 270 ms debounce. The `/api/
 Requires [Claude Code](https://claude.ai/code) with this repository open.
 
 ```
-/data-quality [dbname]
+/data-quality [dbname] [--html]
 ```
 
 Runs a seven-step audit against the target database (defaults to `testdb`):
@@ -156,15 +159,36 @@ Runs a seven-step audit against the target database (defaults to `testdb`):
 
 Produces a structured markdown report with an executive summary table and severity classification (ERROR / WARNING / INFO).
 
+Pass `--html` to also generate `data-quality-report.html` — a fully styled, self-contained report in the Commonwealth Digital theme, with a sticky sidebar, KPI strip, per-step cards with inline NULL bar charts, severity badges, and an executive summary findings table. The markdown report is always emitted to the conversation regardless of this flag.
+
+```bash
+/data-quality              # audit testdb, markdown output only
+/data-quality --html       # audit testdb + write HTML report
+/data-quality mydb --html  # audit a different database + write HTML report
+```
+
+---
+
+## Static HTML artefacts
+
+Two standalone HTML files live in the project root and can be opened directly in any browser:
+
+| File | Description |
+|---|---|
+| `erd.html` | Mermaid.js ER diagrams for both databases — testdb (3 tables, implied FK relationships) and testdb_kimball (star schema, enforced FKs). Styled in the Commonwealth Digital theme. |
+| `data-quality-report.html` | Last-run output of `/data-quality --html`. Regenerate by running `/data-quality --html` in Claude Code. |
+
 ---
 
 ## Repository layout
 
 ```
 ├── generate_data.py        # synthetic data generator (Australian locale, en_AU Faker)
-├── build_kimball.sql       # one-shot SQL ETL for local postgres (uses postgres_fdw)
+├── build_kimball.sql       # one-shot SQL ETL for local postgres
 ├── docker-compose.yml      # three-service stack: db · seeder · app
 ├── .dockerignore
+├── erd.html                # standalone ER diagram (Mermaid.js)
+├── data-quality-report.html # last-run HTML data quality report
 ├── docker/
 │   └── seed.py             # Python ETL seeder used inside Docker (no postgres_fdw)
 ├── webapp/
