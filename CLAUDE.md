@@ -14,6 +14,8 @@ dm/
 ├── build_kimball.sql       # one-shot SQL to build testdb_kimball from testdb (local only)
 ├── docker-compose.yml      # full stack: postgres + seeder + web app
 ├── .dockerignore
+├── erd.html                # standalone ER diagram for testdb + testdb_kimball (Mermaid.js)
+├── data-quality-report.html # last-run HTML data quality report (Commonwealth Digital theme)
 ├── docker/
 │   └── seed.py             # Python ETL seeder used by the Docker seeder service
 ├── webapp/
@@ -105,12 +107,28 @@ before the `app` service starts (`service_completed_successfully` condition).
 
 ## Slash command
 
-`/data-quality [dbname]` — defined in `.claude/commands/data-quality.md`
+`/data-quality [dbname] [--html]` — defined in `.claude/commands/data-quality.md`
 
 Runs a seven-step data quality audit (schema discovery → completeness → uniqueness →
 range validity → format validity → referential integrity → cross-table consistency)
 and produces a structured markdown report with an executive summary table.
 Defaults to `testdb` if no database name is passed.
 
+Pass `--html` to also write `data-quality-report.html` — a fully styled, self-contained
+HTML report in the Commonwealth Digital theme (sticky sidebar, KPI strip, per-step cards
+with NULL bar charts and severity badges, executive summary findings table). The markdown
+report is always emitted to the conversation regardless of the flag.
+
 To add a new check, edit `.claude/commands/data-quality.md` and add a numbered step
 following the existing pattern (state what/why, provide SQL, classify ERROR/WARNING/INFO).
+
+## Static HTML artefacts
+
+Two standalone HTML files live in the project root (open directly in any browser):
+
+- **`erd.html`** — Entity relationship diagrams for both databases rendered with Mermaid.js.
+  Two diagrams: testdb (3 tables, implied FK relationships) and testdb_kimball (star schema,
+  enforced FKs). Includes the known TO_CHAR trailing-whitespace defect note for dim_date.
+
+- **`data-quality-report.html`** — Last-run output of `/data-quality --html`. Commonwealth
+  Digital theme. Regenerate by running `/data-quality --html` (or `--html mydb`).

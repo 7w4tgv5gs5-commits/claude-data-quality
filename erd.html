@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entity Relationship Diagrams — dm databases</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1c3a5e;
+      color: #fff;
+      padding: 28px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+
+    header .icon {
+      width: 40px;
+      height: 40px;
+      background: #1d6fa4;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    header p {
+      font-size: 0.8rem;
+      opacity: 0.65;
+      margin-top: 2px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 40px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #fff;
+      background: #1d6fa4;
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+
+    .section-label.warn { background: #b45309; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 20px 28px 16px;
+      border-bottom: 1px solid #e8ecf0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .card-header h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1c3a5e;
+    }
+
+    .card-header p {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-top: 3px;
+      max-width: 600px;
+      line-height: 1.5;
+    }
+
+    .badge {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .badge-blue   { background: #dbeafe; color: #1e40af; }
+    .badge-green  { background: #dcfce7; color: #166534; }
+    .badge-amber  { background: #fef3c7; color: #92400e; }
+    .badge-purple { background: #ede9fe; color: #5b21b6; }
+
+    .card-body {
+      padding: 28px;
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 16px 28px;
+      border-top: 1px solid #e8ecf0;
+      background: #f8fafc;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: #475569;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .note {
+      background: #fef9ec;
+      border: 1px solid #f6d860;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.8rem;
+      color: #78350f;
+      line-height: 1.55;
+    }
+
+    .note strong { font-weight: 600; }
+
+    .note code {
+      font-family: 'IBM Plex Mono', monospace;
+      background: rgba(0,0,0,0.06);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 0.78rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="icon">⬡</div>
+    <div>
+      <h1>Entity Relationship Diagrams</h1>
+      <p>testdb (source) · testdb_kimball (star schema) · PostgreSQL 18</p>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ── testdb ──────────────────────────────────────────────── -->
+    <div>
+      <div class="section-label warn">⚠ Source — intentionally dirty</div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>testdb — operational / source database</h2>
+            <p>Three normalised tables with no declared foreign key constraints.
+               Referential integrity is implied but not enforced, which is one
+               of the deliberate quality defects captured by the data-quality audit.</p>
+          </div>
+          <span class="badge badge-amber">3 tables · no FK constraints</span>
+        </div>
+        <div class="card-body">
+          <div class="mermaid">
+erDiagram
+    CUSTOMERS {
+        int         id           PK
+        varchar50   first_name
+        varchar50   last_name
+        varchar100  email
+        varchar30   phone
+        date        birthdate
+        date        signup_date
+        varchar50   country
+    }
+
+    PRODUCTS {
+        int         id           PK
+        varchar20   sku
+        varchar100  name
+        varchar50   category
+        numeric102  price
+        int         stock
+        timestamp   created_at
+    }
+
+    ORDERS {
+        int         id           PK
+        int         customer_id  FK
+        int         product_id   FK
+        int         quantity
+        numeric102  unit_price
+        timestamp   ordered_at
+    }
+
+    CUSTOMERS ||--o{ ORDERS : "places (implied)"
+    PRODUCTS  ||--o{ ORDERS : "includes (implied)"
+          </div>
+        </div>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#b45309"></div>
+            Dashed / implied relationships — no FK constraint declared in schema
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#94a3b8"></div>
+            Orphaned order rows exist (customer_id / product_id reference missing rows)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── testdb_kimball ──────────────────────────────────────── -->
+    <div>
+      <div class="section-label">★ Kimball star schema</div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>testdb_kimball — dimensional / analytics database</h2>
+            <p>Classic Kimball star schema derived from testdb via ETL.
+               All foreign keys are enforced. Orphaned or NULL source keys
+               are routed to Unknown sentinel members (SK = 0 / date_sk = −1)
+               so no fact rows are lost during the load.</p>
+          </div>
+          <span class="badge badge-blue">4 tables · FK enforced</span>
+        </div>
+        <div class="card-body">
+          <div class="mermaid">
+erDiagram
+    DIM_CUSTOMER {
+        int         customer_sk  PK
+        int         customer_id  "NK (source)"
+        varchar50   first_name
+        varchar50   last_name
+        varchar101  full_name    "derived"
+        varchar100  email
+        varchar30   phone
+        date        birthdate
+        date        signup_date
+        varchar50   country
+    }
+
+    DIM_PRODUCT {
+        int         product_sk   PK
+        int         product_id   "NK (source)"
+        varchar20   sku
+        varchar100  name
+        varchar50   category
+        numeric102  list_price
+        int         stock
+    }
+
+    DIM_DATE {
+        int         date_sk      PK
+        date        full_date
+        smallint    day_of_week
+        varchar9    day_name     "TRIM() needed"
+        smallint    day_of_month
+        smallint    day_of_year
+        smallint    week_of_year
+        smallint    month_number
+        varchar9    month_name   "TRIM() needed"
+        smallint    quarter
+        smallint    year
+        boolean     is_weekend
+    }
+
+    FACT_ORDERS {
+        int         order_sk     PK
+        int         order_id     "NK (source)"
+        int         customer_sk  FK
+        int         product_sk   FK
+        int         date_sk      FK
+        int         quantity
+        numeric102  unit_price
+        numeric122  line_total   "derived"
+    }
+
+    DIM_CUSTOMER ||--o{ FACT_ORDERS : "customer_sk"
+    DIM_PRODUCT  ||--o{ FACT_ORDERS : "product_sk"
+    DIM_DATE     ||--o{ FACT_ORDERS : "date_sk"
+          </div>
+        </div>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#1d6fa4"></div>
+            PK — surrogate key (auto-increment)
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#7c3aed"></div>
+            NK — natural key carried from source for traceability
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#059669"></div>
+            SK = 0 / date_sk = −1 — Unknown sentinel members for orphaned rows
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ETL lineage note ──────────────────────────────────────── -->
+    <div class="note">
+      <strong>Known ETL defect:</strong>
+      <code>dim_date.day_name</code> and <code>dim_date.month_name</code> carry
+      trailing whitespace from <code>TO_CHAR()</code> padding. Use
+      <code>TRIM(day_name)</code> / <code>TRIM(month_name)</code> in any
+      <code>WHERE</code> clause filtering on those columns.
+    </div>
+
+  </main>
+
+  <footer>generated from live schema · testdb &amp; testdb_kimball · PostgreSQL 18</footer>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor:       '#dbeafe',
+        primaryTextColor:   '#1c3a5e',
+        primaryBorderColor: '#1d6fa4',
+        lineColor:          '#1d6fa4',
+        secondaryColor:     '#f0f2f5',
+        tertiaryColor:      '#fff',
+        fontSize:           '13px',
+        fontFamily:         "'IBM Plex Mono', monospace",
+      },
+      er: {
+        diagramPadding: 24,
+        layoutDirection: 'TB',
+        minEntityWidth: 100,
+        minEntityHeight: 75,
+        entityPadding: 15,
+        useMaxWidth: true,
+      }
+    });
+  </script>
+</body>
+</html>

@@ -4,7 +4,9 @@ Run a comprehensive data quality audit on a local PostgreSQL database and produc
 
 ## Instructions
 
-The user may optionally pass a database name as an argument (e.g. `/data-quality mydb`). If no argument is given, default to `testdb`.
+The user may optionally pass arguments:
+- A database name (e.g. `/data-quality mydb`) — defaults to `testdb` if omitted.
+- `--html` flag (e.g. `/data-quality mydb --html` or `/data-quality --html`) — when present, write the full audit results to a self-contained HTML file named `data-quality-report.html` in the project root, styled in the Commonwealth Digital theme (navy sidebar #1c3a5e, government blue accent #1d6fa4, Plus Jakarta Sans + IBM Plex Mono typography, light grey #f0f2f5 background). The HTML report must include: a sticky sidebar with navigation links to each step section and an overall health score ring; a KPI strip showing ERROR / WARNING / INFO counts and total rows audited; per-step cards with sortable tables, inline NULL bar charts, and severity badges (ERROR = red, WARNING = amber, INFO = blue, PASS = green); and an Executive Summary findings table followed by a plain-English paragraph. After writing the file, open it with `open data-quality-report.html`. Always emit the markdown report to the conversation regardless of whether `--html` is passed.
 
 Use the Bash tool to run `psql` commands. All queries should be run as:
 ```
